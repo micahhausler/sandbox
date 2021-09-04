@@ -1,7 +1,81 @@
-version: "2.1"
+version: "3.8"
 services:
+
+  k3s:
+    image: "rancher/k3s:${K3S_VERSION:-latest}"
+    command: server
+    tmpfs:
+    - /run
+    - /var/run
+    ulimits:
+      nproc: 65535
+      nofile:
+        soft: 65535
+        hard: 65535
+    privileged: true
+    restart: always
+    environment:
+    - K3S_TOKEN=${K3S_TOKEN:?err}
+    - K3S_KUBECONFIG_OUTPUT=/output/kubeconfig.yaml
+    - K3S_KUBECONFIG_MODE=666
+    volumes:
+    - k3s-server:/var/lib/rancher/k3s
+    # This is just so that we get the kubeconfig file out
+    - ./k3s:/output
+    ports:
+    - 6443:6443  # Kubernetes API Server
+    - 8888:80      # Ingress controller port 80
+    - 8443:443    # Ingress controller port 443
+
+  #agent:
+  #  image: "rancher/k3s:${K3S_VERSION:-latest}"
+  #  tmpfs:
+  #  - /run
+  #  - /var/run
+  #  ulimits:
+  #    nproc: 65535
+  #    nofile:
+  #      soft: 65535
+  #      hard: 65535
+  #  privileged: true
+  #  restart: always
+  #  environment:
+  #  - K3S_URL=https://k3s:6443
+  #  - K3S_TOKEN=${K3S_TOKEN:?err}
+
+  tink-controller:
+    image: tink-controller:latest
+    #image: ${TINKERBELL_TINK_SERVER_IMAGE}
+    restart: unless-stopped
+    environment:
+      FACILITY: ${FACILITY:-onprem}
+      PACKET_ENV: ${PACKET_ENV:-testing}
+      PACKET_VERSION: ${PACKET_VERSION:-ignored}
+      ROLLBAR_TOKEN: ${ROLLBAR_TOKEN:-ignored}
+      ROLLBAR_DISABLE: ${ROLLBAR_DISABLE:-1}
+    command:
+      - --kubeconfig=/kubeconfig/kubeconfig.yaml
+      - --k8s-api=https://k3s:6443
+      #- --kubeconfig=/var/mnt/config
+      #- --k8s-api=http://10.1.1.11:8001
+    depends_on:
+      - k3s
+    #healthcheck:
+    #  test: ["CMD-SHELL", "wget -qO- 127.0.0.1:42114/cert"] # port needs to match TINKERBELL_HTTP_AUTHORITY
+    #  interval: 5s
+    #  timeout: 2s
+    #  retries: 30
+    volumes:
+      - ./k3s:/kubeconfig
+      #- ./kubeconfig:/var/mnt/config
+      - ./state/certs:/certs/${FACILITY:-onprem}
+    #ports:
+    #  - 42113:42113/tcp
+    #  - 42114:42114/tcp
+
   tink-server:
-    image: ${TINKERBELL_TINK_SERVER_IMAGE}
+    image: tink-server:latest
+    #image: ${TINKERBELL_TINK_SERVER_IMAGE}
     restart: unless-stopped
     environment:
       FACILITY: ${FACILITY:-onprem}
@@ -19,24 +93,34 @@ services:
       TINKERBELL_HTTP_AUTHORITY: :42114
       TINK_AUTH_USERNAME: ${TINKERBELL_TINK_USERNAME}
       TINK_AUTH_PASSWORD: ${TINKERBELL_TINK_PASSWORD}
+    command:
+      - --k8s-mode=true
+      - --kubeconfig=/kubeconfig/kubeconfig.yaml
+      - --k8s-api=https://k3s:6443
+      #- --kubeconfig=/var/mnt/config
+      #- --k8s-api=http://10.1.1.11:8001
     depends_on:
-      tink-server-migration:
-        condition: service_started
-      db:
-        condition: service_healthy
+      - k3s
+      - tink-server-migration
+        #condition: service_started
+      - db
+        #condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- 127.0.0.1:42114/cert"] # port needs to match TINKERBELL_HTTP_AUTHORITY
       interval: 5s
       timeout: 2s
       retries: 30
     volumes:
+      - ./k3s:/kubeconfig
+      #- ./kubeconfig:/var/mnt/config
       - ./state/certs:/certs/${FACILITY:-onprem}
     ports:
       - 42113:42113/tcp
       - 42114:42114/tcp
 
   tink-server-migration:
-    image: ${TINKERBELL_TINK_SERVER_IMAGE}
+    image: tink-server:latest
+    #image: ${TINKERBELL_TINK_SERVER_IMAGE}
     restart: on-failure
     environment:
       ONLY_MIGRATION: "true"
@@ -52,8 +136,8 @@ services:
       TINK_AUTH_USERNAME: ${TINKERBELL_TINK_USERNAME}
       TINK_AUTH_PASSWORD: ${TINKERBELL_TINK_PASSWORD}
     depends_on:
-      db:
-        condition: service_healthy
+      - db
+        #condition: service_healthy
     volumes:
       - ./state/certs:/certs/${FACILITY:-onprem}
 
@@ -81,10 +165,10 @@ services:
       TINKERBELL_GRPC_AUTHORITY: 127.0.0.1:42113
       TINKERBELL_CERT_URL: http://127.0.0.1:42114/cert
     depends_on:
-      tink-server:
-        condition: service_healthy
-      db:
-        condition: service_healthy
+      - tink-server
+        #condition: service_healthy
+      - db
+        #condition: service_healthy
     network_mode: host
 
   registry:
@@ -139,8 +223,8 @@ services:
       ELASTIC_SEARCH_URL: $TINKERBELL_HOST_IP:9200
       DATA_MODEL_VERSION: 1
     depends_on:
-      db:
-        condition: service_healthy
+      - db
+        #condition: service_healthy
     ports:
       - $TINKERBELL_HOST_IP:80:80/tcp
       - 67:67/udp
@@ -172,8 +256,9 @@ services:
       DATA_MODEL_VERSION: 1
       CUSTOM_ENDPOINTS: '{"/metadata":""}'
     depends_on:
-      db:
-        condition: service_healthy
+      - db
+        #condition: service_healthy
 
 volumes:
-  postgres_data:
+  postgres_data: {}
+  k3s-server: {}

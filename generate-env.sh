@@ -95,6 +95,8 @@ generate_env() (
 		export FACILITY=onprem
 		export ROLLBAR_TOKEN=ignored
 		export ROLLBAR_DISABLE=1
+
+        export K3S_TOKEN=${RANDOM}${RANDOM}${RANDOM}
 	EOF
 )
 
