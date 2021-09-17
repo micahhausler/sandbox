@@ -97,6 +97,7 @@ generate_env() (
 		export ROLLBAR_DISABLE=1
 
         export K3S_TOKEN=${RANDOM}${RANDOM}${RANDOM}
+        export KUBECONFIG=$(dirname "${BASH_SOURCE[0]}")/deploy/k3s/kubeconfig.yaml
 	EOF
 )
 
