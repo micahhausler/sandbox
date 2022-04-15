@@ -19,16 +19,16 @@ cd $GOPATH/src/github.com/tinkerbell
 git clone https://github.com/micahhausler/tink.git
 git -C ./tink checkout krm/tink-server
 # This will make the tinkerbell server and controller images
-make images
+make -C tink images
 
 git clone https://github.com/micahhausler/boots.git
 git -C ./boots checkout krm/client
 # This will make the boots image
-make image
+make -C boots image
 
 git clone https://github.com/chrisdoherty4/hegel.git
 git -C ./hegel checkout cpd/impl-kubernetes-client
-make image
+make -C hegel image
 
 # Update the images in .env with the ones you built
 cat << EOF>> .env
