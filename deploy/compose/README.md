@@ -26,6 +26,10 @@ git -C ./boots checkout krm/client
 # This will make the boots image
 make image
 
+git clone https://github.com/chrisdoherty4/hegel.git
+git -C ./hegel checkout cpd/impl-kubernetes-client
+make image
+
 # Update the images in .env with the ones you built
 cat << EOF>> .env
 BOOTS_SERVER_IMAGE=boots:latest

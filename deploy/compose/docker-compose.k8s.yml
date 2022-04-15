@@ -16,7 +16,7 @@ services:
     environment:
     - K3S_TOKEN=${K3S_TOKEN:?err}
     - K3S_KUBECONFIG_OUTPUT=/output/kubeconfig.yaml
-    - K2S_KUBECONFIG_MODE=666
+    - K3S_KUBECONFIG_MODE=666
     volumes:
     - k3s-server:/var/lib/rancher/k3s
     # This is just so that we get the kubeconfig file out
@@ -76,18 +76,22 @@ services:
     image: ${HEGEL_SERVER_IMAGE}
     environment:
       CUSTOM_ENDPOINTS: '{"/metadata":""}'
-      DATA_MODEL_VERSION: "kubernetes"
+      DATA_MODEL_VERSION: kubernetes
       GRPC_PORT: 42115
       HEGEL_FACILITY: ${FACILITY:-onprem}
       HEGEL_USE_TLS: 0
       PACKET_ENV: testing
       PACKET_VERSION: ${PACKET_VERSION:-ignored}
       ROLLBAR_DISABLE: 1
-      ROLLBAR_TOKEN: ${ROLLBAR_TOKEN-ignored}
+      ROLLBAR_TOKEN: ${ROLLBAR_TOKEN:-ignored}
       TINKERBELL_CERT_URL: http://tink-server:42114/cert
+      HEGEL_KUBECONFIG: /kubeconfig/kubeconfig.yaml
+      HEGEL_KUBE_API: https://k3s:6443
     ports:
       - 50060:50060/tcp
       - 50061:50061/tcp
+    volumes:
+      - ./k3s:/kubeconfig
     depends_on:
       k3s:
         condition: service_healthy
@@ -196,7 +200,8 @@ services:
       REGISTRY_HTTP_TLS_CERTIFICATE: /certs/${FACILITY:-onprem}/server-crt.pem
       REGISTRY_HTTP_TLS_KEY: /certs/${FACILITY:-onprem}/server-key.pem
     init: true
-    network_mode: host
+    ports:
+      - 443:5000/tcp
     volumes:
       - auth:/auth:ro
       - certs:/certs/${FACILITY:-onprem}:ro
